@@ -179,49 +179,61 @@ class Settings extends Admin_Controller {
 
 		public function edit()
 		{
-				$this->auth->restrict('Bonfire.Users.Manage');
+			$this->auth->restrict('Bonfire.Users.Manage');
 
-				$this->load->config('address');
-				$this->load->helper('address');
-				$this->load->helper('form');
+			$this->load->config('address');
+			$this->load->helper('address');
+			$this->load->helper('form');
 
-				$user_id = $this->uri->segment(5);
-				if (empty($user_id))
+			$user_id = $this->uri->segment(5);
+			if (empty($user_id))
+			{
+				Template::set_message(lang('us_empty_id'), 'error');
+				redirect(SITE_AREA .'/settings/users');
+			}
+
+			$this->load->config('user_meta');
+			$meta_fields = config_item('user_meta_fields');
+			Template::set('meta_fields', $meta_fields);
+
+			if ($this->input->post('submit'))
+			{
+				if ($this->save_user('update', $user_id, $meta_fields))
 				{
-						Template::set_message(lang('us_empty_id'), 'error');
-						redirect(SITE_AREA .'/settings/users');
+					$meta_data = array();
+					foreach ($meta_fields as $field)
+					{
+						$meta_data[$field['name']] = $this->input->post($field['name']);
+					}
+
+					// now add the meta is there is meta data
+					$this->user_model->save_meta_for($user_id, $meta_data);
+					
+					$this->load->model('activities/Activity_model', 'activity_model');
+
+					$user = $this->user_model->find($user_id);
+					$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
+					$this->activity_model->log_activity($this->current_user->id, lang('us_log_edit') .': '.$log_name, 'users');
+
+					Template::set_message('User successfully updated.', 'success');
 				}
+			}
 
-				if ($this->input->post('submit'))
-				{
+			$user = $this->user_model->find_user_and_meta($user_id);
+			if (isset($user) && has_permission('Permissions.'.$user->role_name.'.Manage'))
+			{
+				Template::set('user', $user);
+				Template::set('roles', $this->role_model->select('role_id, role_name, default')->find_all());
+				Template::set_view('settings/user_form');
+			}
+			else {
+				Template::set_message(sprintf(lang('us_unauthorized'),$user->role_name), 'error');
+				redirect(SITE_AREA .'/settings/users');
+			}
 
-						if ($this->save_user('update', $user_id))
-						{
-								$this->load->model('activities/Activity_model', 'activity_model');
+			Template::set('toolbar_title', lang('us_edit_user'));
 
-								$user = $this->user_model->find($user_id);
-								$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
-								$this->activity_model->log_activity($this->current_user->id, lang('us_log_edit') .': '.$log_name, 'users');
-
-								Template::set_message('User successfully updated.', 'success');
-						}
-
-				}
-
-				$user = $this->user_model->find($user_id);
-				if (isset($user) && has_permission('Permissions.'.$user->role_name.'.Manage'))
-				{
-						Template::set('user', $user);
-						Template::set('roles', $this->role_model->select('role_id, role_name, default')->find_all());
-						Template::set_view('settings/user_form');
-				} else {
-						Template::set_message(sprintf(lang('us_unauthorized'),$user->role_name), 'error');
-						redirect(SITE_AREA .'/settings/users');
-				}
-
-				Template::set('toolbar_title', lang('us_edit_user'));
-
-				Template::render();
+			Template::render();
 		}
 
 		//--------------------------------------------------------------------
@@ -252,51 +264,55 @@ class Settings extends Admin_Controller {
 		public function delete($users)
 		{
 
-				if (empty($users))
-				{
-						$user_id = $this->uri->segment(5);
+			if (empty($users))
+			{
+				$user_id = $this->uri->segment(5);
 
-						if(!empty($user_id))
-						{
-								$users = array($user_id);
-						}
+				if(!empty($user_id))
+				{
+					$users = array($user_id);
 				}
+			}
 
-				if (!empty($users))
+			if (!empty($users))
+			{
+				$this->auth->restrict('Bonfire.Users.Manage');
+
+				foreach ($users as $id)
 				{
-						$this->auth->restrict('Bonfire.Users.Manage');
+					$user = $this->user_model->find($id);
 
-						foreach ($users as $id)
-						{
+					if (isset($user) && has_permission('Permissions.'.$user->role_name.'.Manage') && $user->id != $this->current_user->id)
+					{
+							if ($this->user_model->delete($id))
+							{
+								$this->load->model('activities/Activity_model', 'activity_model');
+
 								$user = $this->user_model->find($id);
-
-								if (isset($user) && has_permission('Permissions.'.$user->role_name.'.Manage') && $user->id != $this->current_user->id)
-								{
-										if ($this->user_model->delete($id))
-										{
-												$this->load->model('activities/Activity_model', 'activity_model');
-
-												$user = $this->user_model->find($id);
-												$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
-												$this->activity_model->log_activity($this->current_user->id, lang('us_log_delete') . ': '.$log_name, 'users');
-												Template::set_message('The User was successfully deleted.', 'success');
-										} else {
-												Template::set_message(lang('us_action_not_deleted'). $this->user_model->error, 'error');
-										}
-								} else {
-										if ($user->id == $this->current_user->id)
-										{
-												Template::set_message(lang('us_self_delete'), 'error');
-										} else {
-												Template::set_message(sprintf(lang('us_unauthorized'),$user->role_name), 'error');
-										}
-								}
+								$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
+								$this->activity_model->log_activity($this->current_user->id, lang('us_log_delete') . ': '.$log_name, 'users');
+								Template::set_message('The User was successfully deleted.', 'success');
+							}
+							else {
+								Template::set_message(lang('us_action_not_deleted'). $this->user_model->error, 'error');
+							}
+					}
+					else {
+						if ($user->id == $this->current_user->id)
+						{
+							Template::set_message(lang('us_self_delete'), 'error');
 						}
-				} else {
-						Template::set_message(lang('us_empty_id'), 'error');
+						else {
+							Template::set_message(sprintf(lang('us_unauthorized'),$user->role_name), 'error');
+						}
+					}
 				}
+			}
+			else {
+				Template::set_message(lang('us_empty_id'), 'error');
+			}
 
-				redirect(SITE_AREA .'/settings/users');
+			redirect(SITE_AREA .'/settings/users');
 		}
 
 		//--------------------------------------------------------------------
@@ -386,66 +402,75 @@ class Settings extends Admin_Controller {
 
 		//--------------------------------------------------------------------
 
-		private function save_user($type='insert', $id=0)
+		private function save_user($type='insert', $id=0, $meta_fields=array())
 		{
 
-				if ($type == 'insert')
-				{
-						$this->form_validation->set_rules('email', lang('bf_email'), 'required|trim|callback_unique_email|valid_email|max_length[120]|xss_clean');
-						$this->form_validation->set_rules('password', lang('bf_password'), 'required|trim|strip_tags|max_length[40]|xss_clean');
-						$this->form_validation->set_rules('pass_confirm', lang('bf_password_confirm'), 'required|trim|strip_tags|matches[password]|xss_clean');
-				} else {
-						$this->form_validation->set_rules('email', lang('us_label_email'), 'required|trim|valid_email|max_length[120]|xss_clean');
-						$this->form_validation->set_rules('password', lang('bf_password'), 'trim|strip_tags|max_length[40]|matches[pass_confirm]|xss_clean');
-						$this->form_validation->set_rules('pass_confirm', lang('bf_password_confirm'), 'trim|strip_tags|xss_clean');
-				}
+			if ($type == 'insert')
+			{
+				$this->form_validation->set_rules('email', lang('bf_email'), 'required|trim|callback_unique_email|valid_email|max_length[120]|xss_clean');
+				$this->form_validation->set_rules('password', lang('bf_password'), 'required|trim|strip_tags|max_length[40]|xss_clean');
+				$this->form_validation->set_rules('pass_confirm', lang('bf_password_confirm'), 'required|trim|strip_tags|matches[password]|xss_clean');
+			}
+			else {
+				$this->form_validation->set_rules('email', lang('us_label_email'), 'required|trim|valid_email|max_length[120]|xss_clean');
+				$this->form_validation->set_rules('password', lang('bf_password'), 'trim|strip_tags|max_length[40]|matches[pass_confirm]|xss_clean');
+				$this->form_validation->set_rules('pass_confirm', lang('bf_password_confirm'), 'trim|strip_tags|xss_clean');
+			}
 
-				$use_usernames = $this->settings_lib->item('auth.use_own_names');
+			$use_usernames = $this->settings_lib->item('auth.use_own_names');
 
-				$required = false;
-				if ($use_usernames)
-				{
-						$required = 'required|';
-				}
+			$required = false;
+			if ($use_usernames)
+			{
+				$required = 'required|';
+			}
 
-				if ($use_usernames)
-				{
-						$this->form_validation->set_rules('username', lang('bf_username'), $required . 'trim|strip_tags|max_length[30]|callback_unique_username|xsx_clean');
-				}
+			if ($use_usernames)
+			{
+				$this->form_validation->set_rules('username', lang('bf_username'), $required . 'trim|strip_tags|max_length[30]|callback_unique_username|xsx_clean');
+			}
 
-				$this->form_validation->set_rules('display_name', lang('bf_display_name'), 'trim|strip_tags|max_length[255]|xss_clean');
+			$this->form_validation->set_rules('display_name', lang('bf_display_name'), 'trim|strip_tags|max_length[255]|xss_clean');
 
-				if ($this->form_validation->run() === false)
-				{
-						return false;
-				}
+			$meta_data = array();
+			foreach ($meta_fields as $field)
+			{
+				$this->form_validation->set_rules($field['name'], $field['label'], $field['rules']);
 
-				// Compile our core user elements to save.
-				$data = array(
-					'email'		=> $this->input->post('email'),
-					'username'	=> $this->input->post('username')
-				);
+				$meta_data[$field['name']] = $this->input->post($field['name']);
+			}
+			
+			if ($this->form_validation->run() === false)
+			{
+				return false;
+			}
 
-				if ($this->input->post('password'))	$data['password'] = $this->input->post('password');
-				if ($this->input->post('pass_confirm'))	$data['pass_confirm'] = $this->input->post('pass_confirm');
-				if ($this->input->post('role_id')) $data['role_id'] = $this->input->post('role_id');
-				if ($this->input->post('restore')) $data['deleted'] = 0;
-				if ($this->input->post('unban')) $data['banned'] = 0;
-				if ($this->input->post('display_name')) $data['display_name'] = $this->input->post('display_name');
+			// Compile our core user elements to save.
+			$data = array(
+				'email'		=> $this->input->post('email'),
+				'username'	=> $this->input->post('username')
+			);
 
-				if ($type == 'insert')
-				{
-					$return = $this->user_model->insert($data);
-				}
-				else	// Update
-				{
-					$return = $this->user_model->update($id, $data);
-				}
+			if ($this->input->post('password'))	$data['password'] = $this->input->post('password');
+			if ($this->input->post('pass_confirm'))	$data['pass_confirm'] = $this->input->post('pass_confirm');
+			if ($this->input->post('role_id')) $data['role_id'] = $this->input->post('role_id');
+			if ($this->input->post('restore')) $data['deleted'] = 0;
+			if ($this->input->post('unban')) $data['banned'] = 0;
+			if ($this->input->post('display_name')) $data['display_name'] = $this->input->post('display_name');
 
-				// Any modules needing to save data?
-				Events::trigger('save_user', $this->input->post());
+			if ($type == 'insert')
+			{
+				$return = $this->user_model->insert($data);
+			}
+			else	// Update
+			{
+				$return = $this->user_model->update($id, $data);
+			}
 
-				return $return;
+			// Any modules needing to save data?
+			Events::trigger('save_user', $this->input->post());
+
+			return $return;
 		}
 
 		//--------------------------------------------------------------------

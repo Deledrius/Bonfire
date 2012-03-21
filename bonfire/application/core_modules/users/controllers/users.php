@@ -197,44 +197,57 @@ class Users extends Front_Controller {
 		public function profile()
 		{
 
-				if ($this->auth->is_logged_in() === FALSE)
+			if ($this->auth->is_logged_in() === FALSE)
+			{
+				$this->auth->logout();
+				redirect('login');
+			}
+
+			$this->load->config('user_meta');
+			$meta_fields = config_item('user_meta_fields');
+			Template::set('meta_fields', $meta_fields);
+
+			if ($this->input->post('submit'))
+			{
+
+				$user_id = $this->current_user->id;
+				if ($this->save_user($user_id, $meta_fields))
 				{
-						$this->auth->logout();
-						redirect('login');
+
+					$meta_data = array();
+					foreach ($meta_fields as $field)
+					{
+						$meta_data[$field['name']] = $this->input->post($field['name']);
+					}
+
+					// now add the meta is there is meta data
+					$this->user_model->save_meta_for($user_id, $meta_data);
+					
+					$this->load->model('activities/Activity_model', 'activity_model');
+
+					$user = $this->user_model->find($user_id);
+					$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
+					$this->activity_model->log_activity($this->current_user->id, lang('us_log_edit_profile') .': '.$log_name, 'users');
+
+					Template::set_message('Profile successfully updated.', 'success');
 				}
-
-				if ($this->input->post('submit'))
+				else
 				{
-
-						$user_id = $this->current_user->id;
-						if ($this->save_user($user_id))
-						{
-
-								$this->load->model('activities/Activity_model', 'activity_model');
-
-								$user = $this->user_model->find($user_id);
-								$log_name = $this->settings_lib->item('auth.use_own_names') ? $this->current_user->username : ($this->settings_lib->item('auth.use_usernames') ? $user->username : $user->email);
-								$this->activity_model->log_activity($this->current_user->id, lang('us_log_edit_profile') .': '.$log_name, 'users');
-
-								Template::set_message('Profile successfully updated.', 'success');
-						}
-						else
-						{
-								Template::set_message('There was a problem updating your profile', 'error');
-						}//end if
+					Template::set_message('There was a problem updating your profile', 'error');
 				}//end if
+			}//end if
 
-				$this->load->config('address');
-				$this->load->helper('address');
+			$this->load->config('address');
+			$this->load->helper('address');
 
-				// get the current user information
-				//$user = $this->user_model->find_by('id', $this->auth->user_id());
-				$user = $this->user_model->find_user_and_meta ( $this->current_user->id );
+			// get the current user information
+			//$user = $this->user_model->find_by('id', $this->auth->user_id());
+			$user = $this->user_model->find_user_and_meta($this->current_user->id);
 
-				Template::set('user', $user);
+			Template::set('user', $user);
 
-				Template::set_view('users/users/profile');
-				Template::render();
+			Template::set_view('users/users/profile');
+			Template::render();
 		}
 
 		//--------------------------------------------------------------------
@@ -349,8 +362,12 @@ class Users extends Front_Controller {
 				$this->form_validation->set_rules('password', 'Password', 'required|trim|strip_tags|min_length[8]|max_length[120]|xsx_clean');
 				$this->form_validation->set_rules('pass_confirm', 'Password (again)', 'required|trim|strip_tags|matches[password]');
 
-				foreach ($meta_fields as $field) {
+				$meta_data = array();
+				foreach ($meta_fields as $field)
+				{
 					$this->form_validation->set_rules($field['name'], $field['label'], $field['rules']);
+					
+					$meta_data[$field['name']] = $this->input->post($field['name']);
 				}
 				
 				if ($this->form_validation->run() !== FALSE)
@@ -364,6 +381,9 @@ class Users extends Front_Controller {
 
 					if ($user_id = $this->user_model->insert($data))
 					{
+						// now add the meta is there is meta data
+						$this->user_model->save_meta_for($user_id, $meta_data);
+						
 						$this->load->model('activities/Activity_model', 'activity_model');
 
 						$this->activity_model->log_activity($user_id, lang('us_log_register') , 'users');
@@ -407,61 +427,69 @@ class Users extends Front_Controller {
 
 		//--------------------------------------------------------------------
 
-		private function save_user($id=0)
+		private function save_user($id=0, $meta_fields=array())
 		{
 
-				if ( $id == 0 )
+			if ($id == 0)
+			{
+				$id = $this->current_user->id; /* ( $this->input->post('id') > 0 ) ? $this->input->post('id') :  */
+			}
+
+			// Any modules needing to save data?
+			$payload = array('user_id' => $id, 'data' => $this->input->post());
+
+			$_POST['id'] = $id;
+			$this->form_validation->set_rules('email', 'Email', 'required|trim|valid_email|max_length[120]|unique[bf_users.email,bf_users.id]|xss_clean');
+			$this->form_validation->set_rules('password', 'Password', 'trim|strip_tags|max_length[40]|xss_clean');
+			$this->form_validation->set_rules('pass_confirm', 'Password (again)', 'trim|strip_tags|matches[password]|xss_clean');
+
+			if ($this->settings_lib->item('auth.use_usernames'))
+			{
+				$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|unique[bf_users.username,bf_users.id]|xsx_clean');
+			}
+
+			$this->form_validation->set_rules('display_name', lang('bf_display_name'), 'trim|strip_tags|max_length[255]|xss_clean');
+
+			$meta_data = array();
+			foreach ($meta_fields as $field)
+			{
+				$this->form_validation->set_rules($field['name'], $field['label'], $field['rules']);
+
+				$meta_data[$field['name']] = $this->input->post($field['name']);
+			}
+			
+			// Added Event "before_user_validation" to run before the form validation
+			Events::trigger('before_user_validation', $payload );
+
+			if ($this->form_validation->run() === false)
+			{
+				return false;
+			}
+
+			// Compile our core user elements to save.
+			$data = array( 'email'		=> $this->input->post('email') );
+
+			if ($this->input->post('password'))
+			{
+				$data['password'] = $this->input->post('password');
+			}
+
+			if ($this->input->post('display_name'))
+			{
+				$data['display_name'] = $this->input->post('display_name');
+			}
+
+			if ($this->settings_lib->item('auth.use_usernames'))
+			{
+				if ($this->input->post('username'))
 				{
-						$id = $this->current_user->id; /* ( $this->input->post('id') > 0 ) ? $this->input->post('id') :  */
+					$data['username'] = $this->input->post('username');
 				}
+			}
 
-				// Any modules needing to save data?
-				$payload = array ( 'user_id' => $id, 'data' => $this->input->post() );
+			Events::trigger('save_user', $payload );
 
-
-				$this->form_validation->set_rules('email', 'Email', 'required|trim|valid_email|max_length[120]|unique[bf_users.email,bf_users.id]|xss_clean');
-				$this->form_validation->set_rules('password', 'Password', 'trim|strip_tags|max_length[40]|xss_clean');
-				$this->form_validation->set_rules('pass_confirm', 'Password (again)', 'trim|strip_tags|matches[password]|xss_clean');
-
-				if ($this->settings_lib->item('auth.use_usernames'))
-				{
-						$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|unique[bf_users.username,bf_users.id]|xsx_clean');
-				}
-
-				$this->form_validation->set_rules('display_name', lang('bf_display_name'), 'trim|strip_tags|max_length[255]|xss_clean');
-
-				// Added Event "before_user_validation" to run before the form validation
-				Events::trigger('before_user_validation', $payload );
-
-				if ($this->form_validation->run() === false)
-				{
-					return false;
-				}
-
-				// Compile our core user elements to save.
-				$data = array( 'email'		=> $this->input->post('email') );
-
-				if ($this->input->post('password'))
-				{
-					$data['password'] = $this->input->post('password');
-				}
-
-				if ($this->input->post('display_name'))
-				{
-					$data['display_name'] = $this->input->post('display_name');
-				}
-
-				if ($this->settings_lib->item('auth.use_usernames'))
-				{
-					if ($this->input->post('username'))
-					{
-						$data['username'] = $this->input->post('username');
-					}
-				}
-
-				Events::trigger('save_user', $payload );
-
-				return $this->user_model->update($id, $data);
+			return $this->user_model->update($id, $data);
 		}
 
 		//--------------------------------------------------------------------
