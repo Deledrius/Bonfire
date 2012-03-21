@@ -187,3 +187,6 @@ $lang['log_intro']              = 'These are your log messages';
 $lang['bf_action_register']		= 'Sign Up';
 $lang['bf_forgot_password']		= 'Forgot your password?';
 $lang['bf_remember_me']			= 'Remember me';
+
+$lang['user_meta_street_name']	= 'Street Name';
+$lang['user_meta_type']			= 'Type';

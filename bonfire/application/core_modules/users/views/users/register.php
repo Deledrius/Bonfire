@@ -71,6 +71,19 @@
 			</div>
 		</div>
 
+<?php foreach ($meta_fields as $field):?>
+<?php if (!(isset($field['frontend']) && $field['frontend'] === FALSE)):?>
+		<?php if ($field['form_detail']['type'] == 'dropdown'):?>
+			<?php echo form_dropdown($field['form_detail']['settings'], $field['form_detail']['options'], set_value($field['name']), $field['label']);?>
+		<?php else: ?>
+		<?php 
+				$form_method = "form_".$field['form_detail']['type'];
+				echo $form_method($field['form_detail']['settings'], set_value($field['name']), $field['label']);
+?>
+		<?php endif; ?>
+<?php endif; ?>
+<?php endforeach; ?>
+
 	<div class="control-group">
 		<label class="control-label" for="submit">&nbsp;</label>
 		<div class="controls">

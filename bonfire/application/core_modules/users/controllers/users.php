@@ -318,56 +318,64 @@ class Users extends Front_Controller {
 
 		public function register()
 		{
-				// Are users even allowed to register?
-				if (!$this->settings_lib->item('auth.allow_register'))
+			// Are users even allowed to register?
+			if (!$this->settings_lib->item('auth.allow_register'))
+			{
+				Template::set_message('New account registrations are not allowed.', 'attention');
+				redirect('/');
+			}
+
+			$this->load->config('user_meta');
+			$meta_fields = config_item('user_meta_fields');
+			Template::set('meta_fields', $meta_fields);
+
+			$this->load->model('roles/role_model');
+
+			if ($this->input->post('submit'))
+			{
+				// Validate input
+				$this->form_validation->set_rules('email', 'Email', 'required|trim|strip_tags|valid_email|max_length[120]|callback_unique_email|xsx_clean');
+				if ($this->settings_lib->item('auth.use_usernames'))
 				{
-						Template::set_message('New account registrations are not allowed.', 'attention');
-						redirect('/');
+					$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|callback_unique_username|xsx_clean');
 				}
 
-				$this->load->model('roles/role_model');
-
-				if ($this->input->post('submit'))
+				if ($this->settings_lib->item('auth.use_own_names'))
 				{
-						// Validate input
-						$this->form_validation->set_rules('email', 'Email', 'required|trim|strip_tags|valid_email|max_length[120]|callback_unique_email|xsx_clean');
-						if ($this->settings_lib->item('auth.use_usernames'))
-						{
-								$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|callback_unique_username|xsx_clean');
-						}
-
-						if ($this->settings_lib->item('auth.use_own_names'))
-						{
-								$this->form_validation->set_rules('first_name', lang('us_first_name'), 'required|trim|strip_tags|max_length[20]|xss_clean');
-								$this->form_validation->set_rules('last_name', lang('us_last_name'), 'required|trim|strip_tags|max_length[20]|xss_clean');
-						}
-
-						$this->form_validation->set_rules('password', 'Password', 'required|trim|strip_tags|min_length[8]|max_length[120]|xsx_clean');
-						$this->form_validation->set_rules('pass_confirm', 'Password (again)', 'required|trim|strip_tags|matches[password]');
-
-						if ($this->form_validation->run() !== false)
-						{
-								// Time to save the user...
-								$data = array(
-																						'email'		=> $_POST['email'],
-																						'username'	=> isset($_POST['username']) ? $_POST['username'] : '',
-																						'password'	=> $_POST['password']
-																				 );
-
-								if ($user_id = $this->user_model->insert($data))
-								{
-										$this->load->model('activities/Activity_model', 'activity_model');
-
-										$this->activity_model->log_activity($user_id, lang('us_log_register') , 'users');
-										Template::set_message('Your account has been created. Please log in.', 'success');
-										redirect('login');
-								}
-						}
+					$this->form_validation->set_rules('first_name', lang('us_first_name'), 'required|trim|strip_tags|max_length[20]|xss_clean');
+					$this->form_validation->set_rules('last_name', lang('us_last_name'), 'required|trim|strip_tags|max_length[20]|xss_clean');
 				}
 
-				Template::set_view('users/users/register');
-				Template::set('page_title', 'Register');
-				Template::render();
+				$this->form_validation->set_rules('password', 'Password', 'required|trim|strip_tags|min_length[8]|max_length[120]|xsx_clean');
+				$this->form_validation->set_rules('pass_confirm', 'Password (again)', 'required|trim|strip_tags|matches[password]');
+
+				foreach ($meta_fields as $field) {
+					$this->form_validation->set_rules($field['name'], $field['label'], $field['rules']);
+				}
+				
+				if ($this->form_validation->run() !== FALSE)
+				{
+					// Time to save the user...
+					$data = array(
+							'email'		=> $_POST['email'],
+							'username'	=> isset($_POST['username']) ? $_POST['username'] : '',
+							'password'	=> $_POST['password']
+						);
+
+					if ($user_id = $this->user_model->insert($data))
+					{
+						$this->load->model('activities/Activity_model', 'activity_model');
+
+						$this->activity_model->log_activity($user_id, lang('us_log_register') , 'users');
+						Template::set_message('Your account has been created. Please log in.', 'success');
+						redirect('login');
+					}
+				}
+			}
+
+			Template::set_view('users/users/register');
+			Template::set('page_title', 'Register');
+			Template::render();
 		}
 
 		//--------------------------------------------------------------------
@@ -434,15 +442,21 @@ class Users extends Front_Controller {
 				$data = array( 'email'		=> $this->input->post('email') );
 
 				if ($this->input->post('password'))
-						$data['password'] = $this->input->post('password');
+				{
+					$data['password'] = $this->input->post('password');
+				}
 
 				if ($this->input->post('display_name'))
-						$data['display_name'] = $this->input->post('display_name');
+				{
+					$data['display_name'] = $this->input->post('display_name');
+				}
 
 				if ($this->settings_lib->item('auth.use_usernames'))
 				{
-						if ($this->input->post('username'))
-								$data['username'] = $this->input->post('username');
+					if ($this->input->post('username'))
+					{
+						$data['username'] = $this->input->post('username');
+					}
 				}
 
 				Events::trigger('save_user', $payload );
