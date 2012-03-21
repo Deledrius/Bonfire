@@ -224,14 +224,14 @@ class User_model extends BF_Model {
 		Returns:
 			An array of objects with each user's information.
 	*/
-	public function find_all($show_deleted=false) 
+	public function find_all($show_deleted=FALSE) 
 	{
 		if (empty($this->selects))
 		{
 			$this->select($this->table .'.*, role_name');
 		}
 	
-		if ($show_deleted === false)
+		if ($show_deleted === FALSE)
 		{
 			$this->db->where('users.deleted', 0);
 		}

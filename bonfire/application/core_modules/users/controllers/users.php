@@ -347,10 +347,10 @@ class Users extends Front_Controller {
 			if ($this->input->post('submit'))
 			{
 				// Validate input
-				$this->form_validation->set_rules('email', 'Email', 'required|trim|strip_tags|valid_email|max_length[120]|callback_unique_email|xsx_clean');
+				$this->form_validation->set_rules('email', 'Email', 'required|trim|strip_tags|valid_email|max_length[120]|unique[bf_users.email]|xsx_clean');
 				if ($this->settings_lib->item('auth.use_usernames'))
 				{
-					$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|callback_unique_username|xsx_clean');
+					$this->form_validation->set_rules('username', 'Username', 'required|trim|strip_tags|max_length[30]|unique[bf_users.username]|xsx_clean');
 				}
 
 				if ($this->settings_lib->item('auth.use_own_names'))
