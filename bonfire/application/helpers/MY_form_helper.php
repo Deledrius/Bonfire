@@ -48,7 +48,7 @@ if (!function_exists('_form_common'))
 		}
 		
 		$required_class = '';
-		if (TRUE === $data['required'])
+		if (isset($data['required']) && TRUE === $data['required'])
 		{
 			$required_class = " required";
 			unset($data['required']);
