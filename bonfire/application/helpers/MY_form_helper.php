@@ -54,7 +54,7 @@ if (!function_exists('_form_common'))
 			unset($data['required']);
 		}
 		
-		 $error = form_has_error($defaults['name']) ? ' error' : '';
+		$error = form_has_error($defaults['name']) ? ' error' : '';
 		
 		$output = _parse_form_attributes($data, $defaults);
 		$output = <<<EOL
@@ -347,6 +347,16 @@ if ( ! function_exists('form_dropdown'))
 				$defaults['name'] = $data['name'];
 				unset($data['name']);
 			}
+
+			$required_class = '';
+			if (isset($data['required']) && TRUE === $data['required'])
+			{
+				$required_class = " required";
+				unset($data['required']);
+			}
+
+			$error = form_has_error($defaults['name']) ? ' error' : '';
+
 			$output = _parse_form_attributes($data, $defaults);
 			
 			if ( ! is_array($selected))
@@ -391,8 +401,8 @@ if ( ! function_exists('form_dropdown'))
 			}
 			$output = <<<EOL
 
-	<div class="control-group">
-		<label class="control-label" for="{$defaults['name']}">{$label}</label>
+	<div class="control-group{$error}">
+		<label class="control-label{$required_class}" for="{$defaults['name']}">{$label}</label>
 		<div class="controls">
 			 <select {$output}>
 				{$options_vals}
