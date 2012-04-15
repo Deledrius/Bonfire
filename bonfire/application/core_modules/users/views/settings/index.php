@@ -10,7 +10,7 @@
 		<li <?php echo $filter=='inactive' ? 'class="active"' : ''; ?>><a href="<?php echo $current_url .'?filter=inactive'; ?>">Inactive</a></li>
 		<li <?php echo $filter=='banned' ? 'class="active"' : ''; ?>><a href="<?php echo $current_url .'?filter=banned'; ?>">Banned</a></li>
 		<li <?php echo $filter=='deleted' ? 'class="active"' : ''; ?>><a href="<?php echo $current_url .'?filter=deleted'; ?>">Deleted</a></li>
-		<li <?php echo $filter=='role' ? 'class="active"' : ''; ?> class="dropdown">
+		<li class="<?php echo $filter=='role' ? 'active ' : ''; ?>dropdown">
 			<a href="#" class="drodown-toggle" data-toggle="dropdown">
 				By Role <?php echo isset($filter_role) ? ": $filter_role" : ''; ?>
 				<b class="caret light-caret"></b>
@@ -46,10 +46,14 @@
 			<tr>
 				<td colspan="7">
 					<?php echo lang('bf_with_selected') ?>
+					<?php if($filter == 'deleted'):?>
+					<input type="submit" name="purge" class="btn btn-danger" value="<?php echo lang('bf_action_purge') ?>" onclick="return confirm('<?php echo lang('us_purge_del_confirm'); ?>')">
+					<?php else: ?>
 					<input type="submit" name="submit" class="btn" value="<?php echo lang('bf_action_activate') ?>">
 					<input type="submit" name="submit" class="btn" value="<?php echo lang('bf_action_deactivate') ?>">
 					<input type="submit" name="submit" class="btn" value="<?php echo lang('bf_action_ban') ?>">
-					<input type="submit" name="submit" class="btn-danger" id="delete-me" value="<?php echo lang('bf_action_delete') ?>" onclick="return confirm('<?php echo lang('us_delete_account_confirm'); ?>')">
+					<input type="submit" name="delete" class="btn btn-danger" id="delete-me" value="<?php echo lang('bf_action_delete') ?>" onclick="return confirm('<?php echo lang('us_delete_account_confirm'); ?>')">
+					<?php endif;?>
 				</td>
 			</tr>
 		</tfoot>

@@ -56,10 +56,10 @@ class Base_Controller extends MX_Controller {
 		in the controller.
 	*/
 	protected $requested_page;
-	
+
 	/*
 		Var: $current_user
-		
+
 		Stores the current user's details, if they've logged in.
 	*/
 	protected $current_user = null;
@@ -72,12 +72,38 @@ class Base_Controller extends MX_Controller {
 
 		parent::__construct();
 
+		// Auth setup
+		$this->load->model('users/User_model', 'user_model');
+		$this->load->library('users/auth');
+
+		// Load our current logged in user so we can access it anywhere.
+		if ($this->auth->is_logged_in())
+		{
+			$this->current_user = $this->user_model->find($this->auth->user_id());
+			$this->current_user->user_img = gravatar_link($this->current_user->email, 22, $this->current_user->email, "{$this->current_user->email} Profile", ' ', ' ' );
+
+			// if the user has a language setting then use it
+			if (isset($this->current_user->language))
+			{
+				$this->config->set_item('language', $this->current_user->language);
+			}
+
+		}
+
+		// Make the current user available in the views
+		$this->load->vars( array('current_user' => $this->current_user) );
+
+		// load the application lang file here so that the users language is known
+		$this->lang->load('application');
+
 		/*
 			Performance optimizations for production environments.
 		*/
 		if (ENVIRONMENT == 'production')
 		{
 		    $this->db->save_queries = false;
+
+		    $this->load->driver('cache', array('adapter' => 'apc', 'backup' => 'file'));
 		}
 
 		// Development niceties...
@@ -89,10 +115,16 @@ class Base_Controller extends MX_Controller {
 				$this->load->library('Console');
 				$this->output->enable_profiler(true);
 			}
-		}
 
-		// Make sure that we have a cache enine ready to go...
-		$this->load->driver('cache', array('adapter' => 'file'));
+			// Auto-migrate our core and/or app to latest version.
+			if ($this->config->item('migrate.auto_core') || $this->config->item('migrate.auto_app'))
+			{
+				$this->load->library('migrations/migrations');
+				$this->migrations->auto_latest();
+			}
+
+			$this->load->driver('cache', array('adapter' => 'dummy'));
+		}
 
 		$this->previous_page = $this->session->userdata('previous_page');
 		$this->requested_page = $this->session->userdata('requested_page');
@@ -128,20 +160,7 @@ class Front_Controller extends Base_Controller {
 
 		$this->load->library('template');
 		$this->load->library('assets');
-		
-		// Auth setup
-		$this->load->model('users/User_model', 'user_model');
-		$this->load->library('users/auth');
 
-		// Load our current logged in user so we can access it anywhere.
-		if ($this->auth->is_logged_in())
-		{
-			$this->current_user = $this->user_model->find($this->auth->user_id());
-		}
-
-		// Make the current user available in the views
-		$this->load->vars( array('current_user' => $this->current_user) );
-		
 		Template::set_theme('default');
 	}
 
@@ -170,18 +189,8 @@ class Authenticated_Controller extends Base_Controller {
 	{
 		parent::__construct();
 
-		// Auth setup
-		$this->load->model('users/User_model', 'user_model');
-		$this->load->library('users/auth');
-
 		// Make sure we're logged in.
 		$this->auth->restrict();
-
-		// Load our current logged in user so we can access it anywhere.
-		$this->current_user = $this->user_model->find($this->auth->user_id());
-
-		// Make the current user available in the views
-		$this->load->vars( array('current_user' => $this->current_user) );
 
 		// Load additional libraries
 		$this->load->helper('form');
@@ -245,7 +254,7 @@ class Admin_Controller extends Authenticated_Controller {
 		// load the keyboard shortcut keys
 		$shortcut_data = array(
 			'shortcuts' => config_item('ui.current_shortcuts'),
-			'shortcut_keys' => unserialize($this->settings_lib->item('ui.shortcut_keys')),
+			'shortcut_keys' => $this->settings_lib->find_all_by('module', 'core.ui'),
 		);
 		Template::set('shortcut_data', $shortcut_data);
 

@@ -20,13 +20,7 @@
 
 	<?php echo Assets::css(null, true); ?>
 
-	<script src="<?php echo base_url() .'assets/js/head.min.js' ?>"></script>
-	<script>
-	head.feature("placeholder", function() {
-		var inputElem = document.createElement('input');
-		return new Boolean('placeholder' in inputElem);
-	});
-	</script>
+	<script src="<?php echo js_path(); ?>modernizr-2.5.3.js"></script>
 </head>
 <body class="desktop">
 <!--[if lt IE 7]>
@@ -78,7 +72,7 @@
 				<div class="nav pull-right">
 					<div class="btn-group">
 						<a href="<?php echo site_url(SITE_AREA .'/settings/users/edit/'. $current_user->id) ?>" id="tb_email" class="btn dark" title="<?php echo lang('bf_user_settings') ?>">
-							<?php echo config_item('auth.use_usernames') ? (config_item('auth.use_own_names') ? $current_user->username : $current_user->username) : $current_user->email ?>
+							<?php echo (isset($current_user->display_name) && !empty($current_user->display_name)) ? $current_user->display_name : ($this->settings_lib->item('auth.use_usernames') ? $current_user->username : $current_user->email); ?>
 						</a>
 						<a class="btn dropdown-toggle dark" data-toggle="dropdown" href="#"><span class="caret"></span></a>
 						<ul class="dropdown-menu toolbar-profile">
@@ -105,7 +99,7 @@
 
 			</div> <!-- END OF nav-collapse -->
 
-				<?php echo Contexts::render_menu('both'); ?>
+				<?php echo Contexts::render_menu('both', 'normal'); ?>
 			</div><!-- /container -->
 			<div style="clearfix"></div>
 		</div><!-- /topbar-inner -->
