@@ -70,19 +70,49 @@
 				<input class="span6" type="password" name="pass_confirm" id="pass_confirm" value="" placeholder="<?php echo lang('bf_password_confirm'); ?>" />
 			</div>
 		</div>
+		<?php
+			foreach ($meta_fields as $field):
 
-<?php foreach ($meta_fields as $field):?>
-<?php if (!(isset($field['frontend']) && $field['frontend'] === FALSE)):?>
-		<?php if ($field['form_detail']['type'] == 'dropdown'):?>
-			<?php echo form_dropdown($field['form_detail']['settings'], $field['form_detail']['options'], set_value($field['name']), $field['label']);?>
-		<?php else: ?>
-		<?php 
-				$form_method = "form_".$field['form_detail']['type'];
-				echo $form_method($field['form_detail']['settings'], set_value($field['name']), $field['label']);
-?>
-		<?php endif; ?>
-<?php endif; ?>
-<?php endforeach; ?>
+			if (!(isset($field['frontend']) && $field['frontend'] === FALSE)):
+
+				if ($field['form_detail']['type'] == 'dropdown'):
+
+					echo form_dropdown($field['form_detail']['settings'], $field['form_detail']['options'], set_value($field['name']), $field['label']);
+
+
+				elseif ($field['form_detail']['type'] == 'state_select') : ?>
+
+				<div class="control-group <?php echo iif( form_error($field['name']) , 'error'); ?>">
+					<label class="control-label" for="<?= $field['name'] ?>"><?php echo lang('user_meta_state'); ?></label>
+					<div class="controls">
+
+					<?php echo state_select(set_select($field['name']), 'SC', 'US', $field['name'], 'span6 chzn-select'); ?>
+
+					</div>
+				</div>
+
+				<?php elseif ($field['form_detail']['type'] == 'country_select') : ?>
+
+				<div class="control-group <?php echo iif( form_error('country') , 'error'); ?>">
+					<label class="control-label" for="country"><?php echo lang('user_meta_country'); ?></label>
+					<div class="controls">
+
+					<?php echo country_select(set_select($field['name']), 'US', 'country', 'span6 chzn-select'); ?>
+
+					</div>
+				</div>
+
+				<?php else:
+
+
+					$form_method = 'form_' . $field['form_detail']['type'];
+					echo $form_method($field['form_detail']['settings'], set_value($field['name']), $field['label']);
+
+				endif;
+			endif;
+
+			endforeach;
+		?>
 
 	<div class="control-group">
 		<label class="control-label" for="submit">&nbsp;</label>
